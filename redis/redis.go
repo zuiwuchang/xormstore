@@ -4,21 +4,9 @@ import (
 	"context"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/zuiwuchang/xormstore/encode"
 )
 
-// Put(key string, value interface{}) error
-// Get(key string) (interface{}, error)
-// Del(key string) error
-
-// func NewLevelDBStore(dbfile string) (*LevelDBStore, error) {
-// 	db := &LevelDBStore{}
-// 	h, err := leveldb.OpenFile(dbfile, nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	db.store = h
-// 	return db, nil
-// }
 type Store struct {
 	client *redis.Client
 }
@@ -51,6 +39,26 @@ func (s *Store) Close() error {
 }
 func (s *Store) Del(key string) error {
 	cmd := s.client.Del(context.Background(), key)
-	cmd.Result()
+	return cmd.Err()
+}
+func (s *Store) Get(key string) (interface{}, error) {
+	cmd := s.client.Get(context.Background(), key)
+	val, e := cmd.Result()
+	if e != nil {
+		return nil, e
+	}
+	var to interface{}
+	e = encode.GobDecode([]byte(val), &to)
+	if e != nil {
+		return nil, e
+	}
+	return to, nil
+}
+func (s *Store) Put(key string, value interface{}) error {
+	val, e := encode.GobEncode(value)
+	if e != nil {
+		return e
+	}
+	cmd := s.client.Set(context.Background(), key, val, 0)
 	return cmd.Err()
 }
